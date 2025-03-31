@@ -3,6 +3,7 @@
 ## Base URL
 ```
 http://localhost:3000/api
+https://backend.harpaljob.com/api
 ```
 
 ## Authentication
