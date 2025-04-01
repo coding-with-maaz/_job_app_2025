@@ -5,7 +5,7 @@ import '../screens/job_details_screen.dart';
 class JobCard extends StatelessWidget {
   final Job job;
 
-  const JobCard({Key? key, required this.job}) : super(key: key);
+  const JobCard({super.key, required this.job});
 
   @override
   Widget build(BuildContext context) {

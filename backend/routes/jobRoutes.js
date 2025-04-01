@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jobController = require('../controllers/jobController');
+const { upload, compressImageMiddleware } = require('../utils/fileUpload');
 
 // Get all jobs with enhanced search and filtering
 router.get('/', jobController.getAllJobs);
@@ -8,8 +9,14 @@ router.get('/', jobController.getAllJobs);
 // Get today's jobs
 router.get('/today', jobController.getTodayJobs);
 
-// Create a single job
-router.post('/', jobController.createJob);
+// Get all available occupations with job counts
+router.get('/occupations', jobController.getAllOccupations);
+
+// Get jobs by occupation with statistics
+router.get('/occupation/:occupation', jobController.getJobsByOccupation);
+
+// Create a single job with optional image upload and compression
+router.post('/', upload.single('image'), compressImageMiddleware, jobController.createJob);
 
 // Get jobs by location with statistics
 router.get('/location/:location', jobController.getJobsByLocation);

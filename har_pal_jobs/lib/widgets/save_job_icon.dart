@@ -7,11 +7,11 @@ class SaveJobIcon extends StatefulWidget {
   final Color? color;
 
   const SaveJobIcon({
-    Key? key,
+    super.key,
     required this.jobId,
     this.size = 24.0,
     this.color,
-  }) : super(key: key);
+  });
 
   @override
   State<SaveJobIcon> createState() => _SaveJobIconState();

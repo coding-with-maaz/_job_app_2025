@@ -5,7 +5,7 @@ import '../widgets/job_card.dart';
 import '../widgets/loading_indicator.dart';
 
 class SavedJobsScreen extends StatefulWidget {
-  const SavedJobsScreen({Key? key}) : super(key: key);
+  const SavedJobsScreen({super.key});
 
   @override
   State<SavedJobsScreen> createState() => _SavedJobsScreenState();

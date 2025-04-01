@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const Job = require('../models/Job');
 const sequelize = require('sequelize');
 const JobParser = require('../utils/jobParser');
+const path = require('path');
 
 // Create a single job
 exports.createJob = async (req, res) => {
@@ -9,8 +10,15 @@ exports.createJob = async (req, res) => {
     const jobData = {
       ...req.body,
       postedDate: new Date(),
-      status: 'Active'
+      status: 'active',
+      // Ensure occupation is properly formatted
+      occupation: req.body.occupation ? req.body.occupation.trim() : 'Other'
     };
+
+    // Handle image upload if present
+    if (req.file) {
+      jobData.image = path.join('uploads/jobs', req.file.filename);
+    }
 
     const job = await Job.create(jobData);
     res.status(201).json({
@@ -515,6 +523,126 @@ exports.getTodayJobs = async (req, res) => {
       success: false,
       message: 'Failed to fetch today\'s jobs',
       error: error.message
+    });
+  }
+};
+
+// Get jobs by occupation with statistics
+exports.getJobsByOccupation = async (req, res) => {
+  try {
+    const { occupation } = req.params;
+    const { type, experience, location, page = 1, limit = 10 } = req.query;
+
+    const where = {
+      occupation: { [Op.like]: `%${occupation}%` }
+    };
+
+    // Apply additional filters if provided
+    if (type) {
+      where.type = type;
+    }
+
+    if (experience) {
+      where.experience = experience;
+    }
+
+    if (location) {
+      where.location = { [Op.like]: `%${location}%` };
+    }
+
+    // Calculate pagination
+    const offset = (page - 1) * limit;
+
+    // Get total count for pagination
+    const total = await Job.count({ where });
+
+    // Get jobs with pagination
+    const jobs = await Job.findAll({
+      where,
+      order: [['postedDate', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    // Get occupation-specific statistics
+    const stats = await Job.findAll({
+      attributes: [
+        'type',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: { occupation: { [Op.like]: `%${occupation}%` } },
+      group: ['type']
+    });
+
+    // Get experience level distribution
+    const experienceStats = await Job.findAll({
+      attributes: [
+        'experience',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: { occupation: { [Op.like]: `%${occupation}%` } },
+      group: ['experience']
+    });
+
+    // Get salary range distribution
+    const salaryStats = await Job.findAll({
+      attributes: [
+        'salary',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: { occupation: { [Op.like]: `%${occupation}%` } },
+      group: ['salary']
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        jobs,
+        occupation,
+        totalJobs: total,
+        pagination: {
+          total,
+          page: parseInt(page),
+          pages: Math.ceil(total / limit),
+          limit: parseInt(limit)
+        },
+        statistics: {
+          byType: stats,
+          byExperience: experienceStats,
+          bySalary: salaryStats
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch jobs by occupation',
+      error: error.message 
+    });
+  }
+};
+
+// Get all available occupations with job counts
+exports.getAllOccupations = async (req, res) => {
+  try {
+    const occupations = await Job.findAll({
+      attributes: [
+        'occupation',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      group: ['occupation'],
+      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']]
+    });
+
+    res.status(200).json({
+      success: true,
+      data: occupations
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch occupations',
+      error: error.message 
     });
   }
 }; 

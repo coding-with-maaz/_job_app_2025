@@ -19,6 +19,10 @@ const Job = sequelize.define('Job', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  occupation: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
   tags: {
     type: DataTypes.STRING,
     allowNull: false
@@ -62,6 +66,10 @@ const Job = sequelize.define('Job', {
   status: {
     type: DataTypes.ENUM('active', 'closed', 'draft'),
     defaultValue: 'active'
+  },
+  image: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 }, {
   timestamps: true,
