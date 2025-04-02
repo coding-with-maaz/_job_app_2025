@@ -23,6 +23,12 @@ const Job = sequelize.define('Job', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  appType: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'general',
+    comment: 'Type of job app (medical, tech, general, etc.)'
+  },
   tags: {
     type: DataTypes.STRING,
     allowNull: false

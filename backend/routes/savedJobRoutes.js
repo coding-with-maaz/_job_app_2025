@@ -1,14 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const savedJobController = require('../controllers/savedJobController');
+const verifyFirebaseToken = require('../middleware/firebaseAuth');
+
+// All routes require Firebase authentication
+router.use(verifyFirebaseToken);
 
 // Save a job
-router.post('/', savedJobController.saveJob);
+router.post('/:jobId', savedJobController.saveJob);
 
-// Get saved jobs for a user
-router.get('/user/:userId', savedJobController.getSavedJobs);
+// Unsave a job
+router.delete('/:jobId', savedJobController.unsaveJob);
 
-// Remove saved job
-router.delete('/:id', savedJobController.removeSavedJob);
+// Get user's saved jobs
+router.get('/', savedJobController.getSavedJobs);
+
+// Check if a job is saved
+router.get('/check/:jobId', savedJobController.checkIfJobSaved);
 
 module.exports = router; 

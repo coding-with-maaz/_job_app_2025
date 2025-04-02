@@ -12,7 +12,9 @@ exports.createJob = async (req, res) => {
       postedDate: new Date(),
       status: 'active',
       // Ensure occupation is properly formatted
-      occupation: req.body.occupation ? req.body.occupation.trim() : 'Other'
+      occupation: req.body.occupation ? req.body.occupation.trim() : 'Other',
+      // Set appType based on occupation or provided value
+      appType: req.body.appType || (req.body.occupation?.toLowerCase().includes('medical') ? 'medical' : 'general')
     };
 
     // Handle image upload if present
@@ -48,6 +50,7 @@ exports.getAllJobs = async (req, res) => {
       postedDate,
       deadline,
       company,
+      appType,
       sortBy = 'postedDate',
       sortOrder = 'DESC',
       page = 1,
@@ -55,6 +58,11 @@ exports.getAllJobs = async (req, res) => {
     } = req.query;
 
     const where = {};
+
+    // Filter by app type if provided
+    if (appType) {
+      where.appType = appType;
+    }
 
     // Enhanced search functionality
     if (search) {
@@ -134,32 +142,52 @@ exports.getAllJobs = async (req, res) => {
       offset: parseInt(offset)
     });
 
-    // Get location statistics
-    const locationStats = await Job.findAll({
+    // Get app-specific statistics
+    const stats = await Job.findAll({
       attributes: [
-        'location',
+        'type',
         [sequelize.fn('COUNT', sequelize.col('id')), 'count']
       ],
-      group: ['location'],
+      where: appType ? { appType } : {},
+      group: ['type']
+    });
+
+    // Get occupation statistics for the app
+    const occupationStats = await Job.findAll({
+      attributes: [
+        'occupation',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: appType ? { appType } : {},
+      group: ['occupation'],
       order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
       limit: 10
     });
 
     res.status(200).json({
-      jobs,
-      pagination: {
-        total,
-        page: parseInt(page),
-        pages: Math.ceil(total / limit),
-        limit: parseInt(limit)
-      },
-      locationStats
+      success: true,
+      data: {
+        jobs,
+        pagination: {
+          total,
+          page: parseInt(page),
+          pages: Math.ceil(total / limit),
+          limit: parseInt(limit)
+        },
+        statistics: {
+          byType: stats,
+          byOccupation: occupationStats
+        }
+      }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch jobs',
+      error: error.message 
+    });
   }
 };
-
 
 // Get jobs by location with statistics
 exports.getJobsByLocation = async (req, res) => {
@@ -531,11 +559,16 @@ exports.getTodayJobs = async (req, res) => {
 exports.getJobsByOccupation = async (req, res) => {
   try {
     const { occupation } = req.params;
-    const { type, experience, location, page = 1, limit = 10 } = req.query;
+    const { type, experience, location, appType, page = 1, limit = 10 } = req.query;
 
     const where = {
       occupation: { [Op.like]: `%${occupation}%` }
     };
+
+    // Add app type filter if provided
+    if (appType) {
+      where.appType = appType;
+    }
 
     // Apply additional filters if provided
     if (type) {
@@ -570,7 +603,10 @@ exports.getJobsByOccupation = async (req, res) => {
         'type',
         [sequelize.fn('COUNT', sequelize.col('id')), 'count']
       ],
-      where: { occupation: { [Op.like]: `%${occupation}%` } },
+      where: { 
+        occupation: { [Op.like]: `%${occupation}%` },
+        ...(appType ? { appType } : {})
+      },
       group: ['type']
     });
 
@@ -580,7 +616,10 @@ exports.getJobsByOccupation = async (req, res) => {
         'experience',
         [sequelize.fn('COUNT', sequelize.col('id')), 'count']
       ],
-      where: { occupation: { [Op.like]: `%${occupation}%` } },
+      where: { 
+        occupation: { [Op.like]: `%${occupation}%` },
+        ...(appType ? { appType } : {})
+      },
       group: ['experience']
     });
 
@@ -590,7 +629,10 @@ exports.getJobsByOccupation = async (req, res) => {
         'salary',
         [sequelize.fn('COUNT', sequelize.col('id')), 'count']
       ],
-      where: { occupation: { [Op.like]: `%${occupation}%` } },
+      where: { 
+        occupation: { [Op.like]: `%${occupation}%` },
+        ...(appType ? { appType } : {})
+      },
       group: ['salary']
     });
 

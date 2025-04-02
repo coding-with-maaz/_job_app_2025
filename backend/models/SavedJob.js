@@ -7,6 +7,11 @@ const SavedJob = sequelize.define('SavedJob', {
     primaryKey: true,
     autoIncrement: true
   },
+  userId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    comment: 'Firebase User ID'
+  },
   jobId: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -15,17 +20,19 @@ const SavedJob = sequelize.define('SavedJob', {
       key: 'id'
     }
   },
-  userId: {
-    type: DataTypes.INTEGER,
-    allowNull: false
-  },
   savedAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
   }
 }, {
   timestamps: true,
-  tableName: 'saved_jobs'
+  tableName: 'saved_jobs',
+  indexes: [
+    {
+      unique: true,
+      fields: ['userId', 'jobId']
+    }
+  ]
 });
 
 module.exports = SavedJob; 

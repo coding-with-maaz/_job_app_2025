@@ -1,0 +1,357 @@
+// This work is licensed under a Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) https://creativecommons.org/licenses/by-nc-sa/4.0/
+// © StartFromDown
+
+//@version=6
+indicator("Q-Trend [StartFromDown]", overlay=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500)
+
+//------------------------------------------------------------------------------
+//Documentation
+//-----------------------------------------------------------------------------
+// Q-Trend [StartFromDown] - Advanced Trend Analysis Tool
+//
+// DESCRIPTION:
+// Q-Trend is a comprehensive trend analysis tool that combines multiple technical analysis concepts:
+// - Trend identification using ATR-based bands
+// - Buy/Sell signals with strength indicators
+// - Price range predictions
+// - Volume analysis
+// - Percentage-based signal strength
+//
+// KEY FEATURES:
+// 1. Trend Analysis
+//    - Dynamic trend line based on price action
+//    - ATR-based volatility bands
+//    - Trend strength indicator
+//
+// 2. Signal System
+//    - Regular and strong buy/sell signals
+//    - Percentage-based signal strength
+//    - Multiple signal visualization options
+//
+// 3. Prediction System
+//    - Candle range prediction
+//    - Volume prediction
+//    - Support/resistance zones
+//
+// 4. Visual Elements
+//    - Color-coded bars
+//    - Trend lines and bands
+//    - Buy/Sell zones
+//    - Prediction ranges
+//
+// USAGE GUIDE:
+// 1. Basic Trend Following
+//    - Watch the trend line color (green for bullish, red for bearish)
+//    - Use the bands as support/resistance levels
+//    - Follow the percentage indicators for trend strength
+//
+// 2. Signal Trading
+//    - Regular signals: Basic trend changes
+//    - Strong signals: Higher probability setups
+//    - Use percentage indicators to confirm signal strength
+//
+// 3. Range Trading
+//    - Use the prediction ranges for entry/exit points
+//    - Watch the zones for potential reversals
+//    - Monitor volume predictions for confirmation
+//
+// 4. Risk Management
+//    - Use the prediction zones for stop loss placement
+//    - Monitor trend strength percentage
+//    - Watch for strong signals in the opposite direction
+//
+// SETTINGS GUIDE:
+// 1. Main Settings
+//    - Trend Period: Longer for major trends, shorter for minor trends
+//    - ATR Period: Standard 14 for volatility measurement
+//    - ATR Multiplier: Higher for wider bands, lower for tighter bands
+//
+// 2. Mode Settings
+//    - Type A: More conservative signals
+//    - Type B: More aggressive signals
+//    - EMA Smoothing: Reduces noise in price action
+//
+// 3. Visual Settings
+//    - Customize appearance of all elements
+//    - Adjust transparency for better visibility
+//    - Choose between labels and arrows
+//
+// 4. Additional Features
+//    - Enable/disable various prediction tools
+//    - Adjust prediction sensitivity
+//    - Customize zone displays
+
+//------------------------------------------------------------------------------
+//Settings
+//-----------------------------------------------------------------------------
+// Main Settings
+src = input(close, "Source", group="Main Settings")
+p = input.int(200, "Trend Period", minval=1, group="Main Settings", tooltip="Changes STRONG signals' sensitivity")
+atr_p = input.int(14, "ATR Period", minval=1, group="Main Settings")
+mult = input.float(1.0, "ATR Multiplier", step=0.1, group="Main Settings", tooltip="Changes sensitivity: higher value = higher sensitivity")
+
+// Mode Settings
+mode = input.string("Type A", "Signal Mode", options=["Type A", "Type B"], group="Mode Settings")
+use_ema_smoother = input.string("No", "Smooth Source with EMA?", options=["Yes", "No"], group="Source Settings")
+src_ema_period = input(3, "EMA Smoother Period", group="Source Settings")
+
+// Visual Settings
+color_bars = input(true, "Color Bars?", group="Visual Settings")
+show_tl = input(true, "Show Trend Line?", group="Visual Settings")
+tl_width = input.int(3, "Trend Line Width", minval=1, maxval=4, group="Visual Settings")
+show_zones = input(true, "Show Buy/Sell Zones", group="Visual Settings")
+zone_transparency = input.int(90, "Zone Transparency", minval=0, maxval=100, group="Visual Settings")
+
+// Signal Settings
+signals_view = input.string("All", "Signals to Show", options=["All", "Buy/Sell", "Strong", "None"], group="Signal Settings")
+signals_shape = input.string("Labels", "Signal's Shape", options=["Labels", "Arrows"], group="Signal Settings")
+buy_col = input.color(color.new(#00c853, 0), "Buy Color", group="Signal Settings", inline="BS")
+sell_col = input.color(color.new(#ff1744, 0), "Sell Color", group="Signal Settings", inline="BS")
+
+// Additional Features
+show_bands = input(true, "Show Bands", group="Additional Features")
+band_transparency = input.int(90, "Band Transparency", minval=0, maxval=100, group="Additional Features")
+show_strength = input(true, "Show Trend Strength", group="Additional Features")
+strength_period = input.int(14, "Strength Period", minval=1, group="Additional Features")
+show_range = input(true, "Show Price Range", group="Additional Features")
+show_prediction = input(true, "Show Candle Range Prediction", group="Additional Features")
+prediction_atr_mult = input.float(1.5, "Prediction ATR Multiplier", minval=0.1, step=0.1, group="Additional Features")
+show_prediction_zones = input(true, "Show Prediction Zones", group="Additional Features")
+prediction_zone_transparency = input.int(90, "Prediction Zone Transparency", minval=0, maxval=100, group="Additional Features")
+show_percentage = input(true, "Show Signal Percentage", group="Additional Features")
+
+//------------------------------------------------------------------------------
+//Calculations
+//-----------------------------------------------------------------------------
+// Source Calculation
+src := use_ema_smoother == "Yes" ? ta.ema(src, src_ema_period) : src
+
+// Basic Calculations
+h = ta.highest(src, p)
+l = ta.lowest(src, p)
+d = h - l
+m = (h + l) / 2
+m := bar_index > p ? m[1] : m
+
+// ATR and Epsilon
+atr = ta.atr(atr_p)[1]
+epsilon = mult * atr
+
+// Signal Calculations
+var bool cross_over_m = false
+var bool cross_over_band = false
+var bool cross_under_m = false
+var bool cross_under_band = false
+
+cross_over_m := ta.crossover(src, m)
+cross_over_band := ta.crossover(src, m + epsilon)
+cross_under_m := ta.crossunder(src, m)
+cross_under_band := ta.crossunder(src, m - epsilon)
+
+change_up = src > m or cross_over_m or cross_over_band
+change_down = src < m or cross_under_m or cross_under_band
+
+// Strong Signal Calculations
+sb = open < l + d / 8 and open >= l
+ss = open > h - d / 8 and open <= h
+strong_buy = sb or sb[1] or sb[2] or sb[3] or sb[4]
+strong_sell = ss or ss[1] or ss[2] or ss[3] or ss[4]
+
+// Trend Line Update
+m := (change_up or change_down) and m != m[1] ? m : change_up ? m + epsilon : change_down ? m - epsilon : nz(m[1], m)
+
+// Last Signal Tracking
+var ls = ""
+ls := change_up ? "B" : change_down ? "S" : ls[1]
+
+// Color Assignment
+colour = ls == "B" ? buy_col : sell_col
+
+// Shape Definitions
+buy_shape = signals_shape == "Labels" ? shape.labelup : shape.triangleup
+sell_shape = signals_shape == "Labels" ? shape.labeldown : shape.triangledown
+
+// Trend Strength Calculation
+trend_strength = show_strength ? ta.ema(math.abs(src - m) / atr, strength_period) : na
+
+// Signal Percentage Calculation
+var float buy_percentage = 0.0
+var float sell_percentage = 0.0
+var float trend_strength_percentage = 0.0
+
+// Calculate trend strength percentage based on multiple factors
+price_distance = math.abs(src - m) / epsilon
+momentum = ta.change(src, 1)
+rsi = ta.rsi(src, 14)
+macd = ta.macd(src, 12, 26, 9)
+macd_signal = macd[1]
+macd_hist = macd - macd_signal
+
+// Calculate trend strength with multiple confirmations
+trend_strength_percentage := math.min(100, 
+    price_distance * 40 +  // Price distance from trend line (40% weight)
+    (momentum > 0 ? 20 : 0) +  // Momentum factor (20% weight)
+    (rsi > 50 ? 20 : 0) +  // RSI confirmation (20% weight)
+    (macd_hist > 0 ? 20 : 0)  // MACD confirmation (20% weight)
+)
+
+// Calculate buy/sell percentages with advanced factors
+// Base calculation from price distance and momentum
+buy_percentage := change_up ? math.min(100, 
+    (src - m) / epsilon * 30 +  // Price distance (30% weight)
+    (momentum > 0 ? 20 : 0) +  // Momentum (20% weight)
+    (rsi < 70 ? 15 : 0) +  // RSI not overbought (15% weight)
+    (macd_hist > 0 ? 15 : 0) +  // MACD histogram positive (15% weight)
+    (volume > ta.sma(volume, 20) ? 10 : 0) +  // Volume confirmation (10% weight)
+    (atr > ta.sma(atr, 14) ? 10 : 0)  // Volatility confirmation (10% weight)
+) : buy_percentage[1]
+
+sell_percentage := change_down ? math.min(100, 
+    (m - src) / epsilon * 30 +  // Price distance (30% weight)
+    (momentum < 0 ? 20 : 0) +  // Momentum (20% weight)
+    (rsi > 30 ? 15 : 0) +  // RSI not oversold (15% weight)
+    (macd_hist < 0 ? 15 : 0) +  // MACD histogram negative (15% weight)
+    (volume > ta.sma(volume, 20) ? 10 : 0) +  // Volume confirmation (10% weight)
+    (atr > ta.sma(atr, 14) ? 10 : 0)  // Volatility confirmation (10% weight)
+) : sell_percentage[1]
+
+// Add trend confirmation bonus
+trend_bonus = 10
+buy_percentage := buy_percentage + (ls == "B" ? trend_bonus : 0)
+sell_percentage := sell_percentage + (ls == "S" ? trend_bonus : 0)
+
+// Add strong signal bonus
+strong_bonus = 15
+buy_percentage := buy_percentage + (strong_buy ? strong_bonus : 0)
+sell_percentage := sell_percentage + (strong_sell ? strong_bonus : 0)
+
+// Cap percentages at 100
+buy_percentage := math.min(100, buy_percentage)
+sell_percentage := math.min(100, sell_percentage)
+trend_strength_percentage := math.min(100, trend_strength_percentage)
+
+// Zone Calculations
+var float buy_zone_high = na
+var float buy_zone_low = na
+var float sell_zone_high = na
+var float sell_zone_low = na
+
+buy_zone_high := show_zones and ls == "B" ? m + epsilon : na
+buy_zone_low := show_zones and ls == "B" ? m - epsilon : na
+sell_zone_high := show_zones and ls == "S" ? m + epsilon * 2 : na
+sell_zone_low := show_zones and ls == "S" ? m - epsilon * 2 : na
+
+// Candle Range Prediction
+var float pred_high = na
+var float pred_low = na
+var float pred_high_zone = na
+var float pred_low_zone = na
+var float pred_volume = na
+
+// Calculate prediction based on trend and volatility
+pred_high := show_prediction ? close + (atr * prediction_atr_mult) : na
+pred_low := show_prediction ? close - (atr * prediction_atr_mult) : na
+
+// Calculate wider prediction zones
+pred_high_zone := show_prediction_zones ? close + (atr * prediction_atr_mult * 2) : na
+pred_low_zone := show_prediction_zones ? close - (atr * prediction_atr_mult * 2) : na
+
+// Calculate predicted volume based on trend
+pred_volume := ta.ema(volume, 20) * (1 + (math.abs(src - m) / (h - l)))
+
+//------------------------------------------------------------------------------
+//Plotting
+//-----------------------------------------------------------------------------
+// Trend Line
+plot(show_tl ? m : na, "Trend Line", colour, tl_width)
+
+// Bands
+plot(show_bands ? m + epsilon : na, "Upper Band", color.new(colour, band_transparency))
+plot(show_bands ? m - epsilon : na, "Lower Band", color.new(colour, band_transparency))
+
+// Buy/Sell Zones
+plot(buy_zone_high, "Buy Zone High", color.new(buy_col, zone_transparency))
+plot(buy_zone_low, "Buy Zone Low", color.new(buy_col, zone_transparency))
+plot(sell_zone_high, "Sell Zone High", color.new(sell_col, zone_transparency))
+plot(sell_zone_low, "Sell Zone Low", color.new(sell_col, zone_transparency))
+
+// Fill between zones
+fill(plot(ls == "B" ? buy_zone_high : na, "Buy Zone Fill High", color.new(buy_col, zone_transparency)), 
+     plot(ls == "B" ? buy_zone_low : na, "Buy Zone Fill Low", color.new(buy_col, zone_transparency)), 
+     color.new(buy_col, zone_transparency))
+
+fill(plot(ls == "S" ? sell_zone_high : na, "Sell Zone Fill High", color.new(sell_col, zone_transparency)), 
+     plot(ls == "S" ? sell_zone_low : na, "Sell Zone Fill Low", color.new(sell_col, zone_transparency)), 
+     color.new(sell_col, zone_transparency))
+
+// Signals with Labels
+plotshape(signals_shape == "Labels" and (signals_view == "All" or signals_view == "Buy/Sell") and change_up and not strong_buy, "Buy Signal", color=colour, style=buy_shape, location=location.belowbar, size=size.normal, text="BUY", textcolor=color.white)
+
+plotshape(signals_shape == "Labels" and (signals_view == "All" or signals_view == "Buy/Sell") and change_down and not strong_sell, "Sell Signal", color=colour, style=sell_shape, size=size.normal, text="SELL", textcolor=color.white)
+
+plotshape(signals_shape == "Labels" and (signals_view == "All" or signals_view == "Strong") and change_up and strong_buy, "Strong Buy Signal", color=colour, style=buy_shape, location=location.belowbar, size=size.normal, text="STRONG", textcolor=color.white)
+
+plotshape(signals_shape == "Labels" and (signals_view == "All" or signals_view == "Strong") and change_down and strong_sell, "Strong Sell Signal", color=colour, style=sell_shape, size=size.normal, text="STRONG", textcolor=color.white)
+
+// Signals with Arrows
+plotshape(signals_shape == "Arrows" and (signals_view == "All" or signals_view == "Buy/Sell") and change_up and not strong_buy, "Buy Signal", color=colour, style=buy_shape, location=location.belowbar, size=size.tiny)
+
+plotshape(signals_shape == "Arrows" and (signals_view == "All" or signals_view == "Buy/Sell") and change_down and not strong_sell, "Sell Signal", color=colour, style=sell_shape, size=size.tiny)
+
+plotshape(signals_shape == "Arrows" and (signals_view == "All" or signals_view == "Strong") and change_up and strong_buy, "Strong Buy Signal", color=colour, style=buy_shape, location=location.belowbar, size=size.tiny)
+
+plotshape(signals_shape == "Arrows" and (signals_view == "All" or signals_view == "Strong") and change_down and strong_sell, "Strong Sell Signal", color=colour, style=sell_shape, size=size.tiny)
+
+// Bar Coloring
+barcolor(color_bars ? colour : na)
+
+// Trend Strength Label
+if show_strength and barstate.islast
+    label.new(bar_index, high, "Strength: " + str.tostring(trend_strength, "#.##"), color=color.new(colour, 80), style=label.style_label_down, textcolor=colour, size=size.small)
+
+// Price Range Label
+if show_range and barstate.islast
+    range_text = "Range: " + str.tostring(l, "#.##") + " - " + str.tostring(h, "#.##")
+    label.new(bar_index, low, range_text, color=color.new(colour, 80), style=label.style_label_up, textcolor=colour, size=size.small)
+
+// Plot Prediction Range
+plot(show_prediction ? pred_high : na, "Predicted High", color.new(colour, 70), style=plot.style_circles)
+plot(show_prediction ? pred_low : na, "Predicted Low", color.new(colour, 70), style=plot.style_circles)
+
+// Plot Prediction Zones
+plot(show_prediction_zones ? pred_high_zone : na, "Predicted High Zone", color.new(colour, prediction_zone_transparency))
+plot(show_prediction_zones ? pred_low_zone : na, "Predicted Low Zone", color.new(colour, prediction_zone_transparency))
+
+// Fill between prediction zones
+fill(plot(show_prediction_zones ? pred_high_zone : na, "Prediction Zone High", color.new(colour, prediction_zone_transparency)), 
+     plot(show_prediction_zones ? pred_low_zone : na, "Prediction Zone Low", color.new(colour, prediction_zone_transparency)), 
+     color.new(colour, zone_transparency))
+
+// Prediction Labels
+if show_prediction and barstate.islast
+    pred_text = "Predicted Range: " + str.tostring(pred_low, "#.##") + " - " + str.tostring(pred_high, "#.##")
+    pred_zone_text = "Predicted Zone: " + str.tostring(pred_low_zone, "#.##") + " - " + str.tostring(pred_high_zone, "#.##")
+    pred_volume_text = "Predicted Volume: " + str.tostring(pred_volume, "#.##")
+    
+    label.new(bar_index, pred_high, pred_text, color=color.new(colour, 80), style=label.style_label_down, textcolor=colour, size=size.small)
+    label.new(bar_index, pred_high_zone, pred_zone_text, color=color.new(colour, 80), style=label.style_label_down, textcolor=colour, size=size.small)
+    label.new(bar_index, pred_low_zone, pred_volume_text, color=color.new(colour, 80), style=label.style_label_up, textcolor=colour, size=size.small)
+
+// Signal Percentage Labels
+if show_percentage and barstate.islast
+    buy_perc_text = "Buy Strength: " + str.tostring(buy_percentage, "#.##") + "%"
+    sell_perc_text = "Sell Strength: " + str.tostring(sell_percentage, "#.##") + "%"
+    trend_perc_text = "Trend Strength: " + str.tostring(trend_strength_percentage, "#.##") + "%"
+    
+    label.new(bar_index, high * 1.001, buy_perc_text, color=color.new(buy_col, 80), style=label.style_label_down, textcolor=buy_col, size=size.small)
+    label.new(bar_index, low * 0.999, sell_perc_text, color=color.new(sell_col, 80), style=label.style_label_up, textcolor=sell_col, size=size.small)
+    label.new(bar_index, m, trend_perc_text, color=color.new(colour, 80), style=label.style_label_right, textcolor=colour, size=size.small)
+
+//------------------------------------------------------------------------------
+//Alerts
+//-----------------------------------------------------------------------------
+alertcondition(change_up, "Q-Trend BUY", "Q-Trend BUY signal was given")
+alertcondition(change_down, "Q-Trend SELL", "Q-Trend SELL signal was given")
+alertcondition(change_up or change_down, "Q-Trend Signal", "Q-Trend gave you a signal!")
+alertcondition(change_up and strong_buy, "Strong BUY Signal", "Q-Trend gave a Strong Buy signal!")
+alertcondition(change_down and strong_sell, "Strong SELL Signal", "Q-Trend gave a Strong Sell signal!") 
